@@ -242,6 +242,176 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/09/05/Red-Hat-Enterprise-Linux-7-4上安装Oracle-11-2-0-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Ludo">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/img/face.png">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="pluto-tec blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2018/09/05/Red-Hat-Enterprise-Linux-7-4上安装Oracle-11-2-0-4/" itemprop="url">Red Hat Enterprise Linux 7.4上安装Oracle 11.2.0.4</a></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-09-05T14:39:15+08:00">
+                2018-09-05
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <ol>
+<li>配置Yum源及关闭SeLinux<br>[root@localhost ~]# mkdir /media/rhel<br>[root@localhost ~]# mount /dev/cdrom /media/rhel<br>mount: /dev/sr0 is write-protected, mounting read-only</li>
+</ol>
+<p>[root@localhost ~]# vi /etc/yum.repos.d/iso.repo<br>[iso]<br>name=iso<br>baseurl=file:///media/rhel<br>enabled=1<br>gpgcheck=0</p>
+<p>[root@localhost ~]# vi /etc/selinux/config</p>
+<h1 id="modify"><a href="#modify" class="headerlink" title="modify"></a>modify</h1><p>SELINUX=disabled</p>
+<ol start="2">
+<li><p>安装桌面环境（如果未安装）<br>[root@localhost ~]# yum -y group install “Server with GUI”</p>
+</li>
+<li><p>安装软件包<br>[root@localhost ~]# yum -y install binutils binutils-devel compat-libcap1 compat-libstdc++-33 compat-libstdc++-33.i686 ksh elfutils-libelf elfutils-libelf-devel glibc glibc-common glibc-devel glibc-headers gcc gcc-c++ libaio libaio.i686 libaio-devel libaio-devel.i686 libgcc libstdc++ libstdc++.i686 libstdc++-devel libstdc++-devel.i686 make sysstat unixODBC unixODBC-devel libXp libXp-devel libXpm-devel telnet</p>
+</li>
+<li><p>建立用户<br>[root@localhost ~]# groupadd oinstall<br>[root@localhost ~]# groupadd dba<br>[root@localhost ~]# useradd -g oinstall -G dba oracle<br>[root@localhost ~]# passwd oracle<br>[root@localhost ~]# vi /etc/profile</p>
+<h1 id="add-to-the-end"><a href="#add-to-the-end" class="headerlink" title="add to the end"></a>add to the end</h1><p>if [ \$USER = “oracle” ];then</p>
+<pre><code>if [ \$SHELL = &quot;/bin/ksh&quot; ];then
+        ulimit -p 16384
+        ulimit -n 65536
+else
+        ulimit -u 16384 -n 65536
+fi
+umask 022
+</code></pre><p>fi</p>
+</li>
+<li><p>建立文件夹<br>[root@localhost ~]# mkdir -p /u01/oracle<br>[root@localhost ~]# mkdir -p /u01/oracle/11.2.0/db_1<br>[root@localhost ~]# chown -R oracle:oinstall /u01/oracle/<br>[root@localhost ~]# chown -R oracle:oinstall /u01/oracle/11.2.0/db_1/<br>[root@localhost ~]# chmod -R 755 /u01/oracle/<br>[root@localhost ~]# chmod -R 755 /u01/oracle/11.2.0/db_1/</p>
+</li>
+<li><p>配置系统核心参数，Oracle用户资源限制，Oracle用户环境变量<br>[root@localhost ~]# MEMTOTAL=$(free -b | sed -n ‘2p’ | awk ‘{print $2}’)<br>[root@localhost ~]# SHMMAX=$(expr $MEMTOTAL / 2)<br>[root@localhost ~]# SHMMNI=4096<br>[root@localhost ~]# PAGESIZE=$(getconf PAGE_SIZE)<br>[root@localhost ~]# cat &gt;&gt; /etc/sysctl.conf &lt;&lt; EOF<br>fs.aio-max-nr = 1048576<br>fs.file-max = 6815744<br>kernel.shmmax = $SHMMAX<br>kernel.shmall = $(expr ( $SHMMAX / $PAGESIZE ) * ( $SHMMNI / 16 ))<br>kernel.shmmni = $SHMMNI<br>kernel.sem = 250 32000 100 128<br>net.ipv4.ip_local_port_range = 9000 65500<br>net.core.rmem_default = 262144<br>net.core.rmem_max = 4194304<br>net.core.wmem_default = 262144<br>net.core.wmem_max = 1048576<br>EOF</p>
+</li>
+</ol>
+<p>[root@localhost ~]# sysctl -p<br>[root@localhost ~]# vi /etc/security/limits.conf</p>
+<h1 id="add-to-the-end-1"><a href="#add-to-the-end-1" class="headerlink" title="add to the end"></a>add to the end</h1><p>oracle  soft  nproc   2047<br>oracle  hard  nproc   16384<br>oracle  soft  nofile  1024<br>oracle  hard  nofile  65536<br>oracle  soft  stack   10240<br>oracle  hard  stack   32768</p>
+<p>[root@localhost ~]# vi /home/oracle/.bash_profile</p>
+<h1 id="add-to-the-end-2"><a href="#add-to-the-end-2" class="headerlink" title="add to the end"></a>add to the end</h1><p>export ORACLE_SID=orcl;<br>export ORACLE_BASE=/u01/oracle;<br>export ORACLE_HOME=/u01/oracle/11.2.0/db_1;<br>export PATH=$ORACLE_HOME/bin:$PATH:$HOME/bin<br>export LD_LIBRARY_PATH=$ORACLE_HOME/lib<br>[root@localhost ~]# reboot</p>
+<ol start="7">
+<li>编辑主机名<br>[root@localhost ~]# vi /etc/hosts<h1 id="add"><a href="#add" class="headerlink" title="add"></a>add</h1>192.168.10.11 oracle</li>
+</ol>
+<p>[root@localhost ~]# vi /etc/hostname</p>
+<h1 id="modify-1"><a href="#modify-1" class="headerlink" title="modify"></a>modify</h1><p>oracle</p>
+<p>—[root@localhost ~]# vi /etc/sysconfig/network<br>NETWORKING=yes<br>NETWORKING_IPV6=no<br>HOSTNAME=oracle11g1.localdomain         —HOSTNAME为主机名</p>
+<ol start="8">
+<li><p>解压安装文件<br>[root@localhost ~]# cd /opt<br>[root@localhost opt]# unzip p13390677_112040_Linux-x86-64_1of7.zip ;unzip p13390677_112040_Linux-x86-64_2of7.zip</p>
+</li>
+<li><p>开始安装<br>[root@localhost rhel]# xhost +<br>access control disabled, clients can connect from any host</p>
+</li>
+</ol>
+<p>[root@localhost rhel]# su - oracle<br>[oracle@localhost ~]$ export DISPLAY=10.1.105.52:0.0       —此处IP请改为客户端的IP<br>[oracle@localhost ~]$ cd /opt/database/<br>[oracle@localhost database]$ ./runInstaller<br>—检查发现少了一个软件包，且在光盘中搜不到，需要网上下载后手动安装。  [root@localhost opt]# rpm -ivh compat-libstdc++-33-3.2.3-72.el7.x86_64.rpm</p>
+<p>[INS-32031]Invalid inventorylocation [INS-32033]Central Inventorylocation is not vritable<br>解决办法：修改/home/oracle_11的权限chown -R oracle:oinstall /u01</p>
+<p>出现错误调用makefile /oracle/app/oracle/product/11.2.0/db_1/sysman/lib/ins_emagent.mk的目标nmo时出错。找到$ORACLE_HOME/sysman/lib/ins_emagent.mk文件<br>[oracle@localhost ~]$ cd $ORACLE_HOME/sysman/lib<br>[oracle@localhost lib]$ cp ins_emagent.mk ins_emagent.mk.bak<br>[oracle@localhost lib]$ vi ins_emagent.mk<br>查找$(MK_EMAGENT_NMECTL),更改为$(MK_EMAGENT_NMECTL) -lnnz11  —注意：lnnz和$(MK_EMAGENT_NMECTL)之间有空格,然后点“重试“按钮就可以了</p>
+<p>在lib包check时，遇到一则告警信息，Package: pdksh-5.2.4 Warning忽略ignore掉就可以。pdksh是一个老包，新的oracle都使用ksh包，但oracle的check机制里面并没有把这个check去掉，所以在执行界面安装oracle的时候，还会有告警信息，我们可以忽略掉它。</p>
+<p>[root@localhost opt]# /u01/oracle/oraInventory/orainstRoot.sh<br>[root@localhost opt]# /u01/oracle/11.2.0/db_1/root.sh<br>至此安装完成！</p>
+<p>dbca!<br>netca!</p>
+<p>?添加LOCAL_OS_AUTHENTICATION_LISTENER = OFF<br>Linux 7 防火墙<br>systemctl status firewalld                —查看防火墙状态<br>systemctl stop firewalld                —临时关闭防火墙。重启电脑后，防火墙自动起来<br>systemctl disable firewalld                —永久关闭防火墙。重启后，防火墙不会自动启动<br>systemctl enable firewalld                —打开防火墙</p>
+<p>startup;<br>ORA-01078: failure in processing system parameters<br>LRM-00109: could not open parameter file ‘/oracle/app/oracle/product/11.2.0/db_1/dbs/initicare1.ora ‘<br>解决此问题方法<br>startup pfile=/oracle/app/oracle/admin/orcl/pfile/ora.1114201016265;<br>create spfile from memory;<br>shutdown immediate;<br>startup;</p>
+
+          
+        
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/08/26/2018-8-26-for-mac-word/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -879,7 +1049,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">5</span>
+                  <span class="site-state-item-count">6</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
